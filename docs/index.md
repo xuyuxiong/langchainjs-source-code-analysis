@@ -1,109 +1,148 @@
-# LangChainJS 源码深度解析
+---
+layout: home
 
-深入剖析 LangChainJS 架构、LCEL 表达式语言、Agent 系统与 35+ 提供商集成实现原理。
+hero:
+  name: LangChainJS 源码深度解析
+  text: LangChainJS 完整源码学习指南
+  tagline: 从 LCEL 到 Agent 系统，全面掌握 LangChain 核心原理
+  image:
+    src: /langchain-logo.svg
+    alt: LangChain Logo
+  actions:
+    - theme: brand
+      text: 开始学习
+      link: /guide/getting-started
+    - theme: alt
+      text: GitHub
+      link: https://github.com/xuyuxiong/langchainjs-source-code-analysis
 
-## 📚 文档导航
+features:
+  - icon: 🔗
+    title: LangChainJS 0.3+
+    details: 全面覆盖 LangChainJS 最新特性，包括 LCEL 表达式语言、Runnable 接口、Agent 系统等
+  - icon: 📚
+    title: 渐进式学习
+    details: 从指南篇 → 架构篇 → LCEL → 组件篇 → 集成篇，自顶向下，符合认知规律
+  - icon: 🔍
+    title: 源码调试
+    details: 手把手教你搭建调试环境，深入理解每一行代码
+  - icon: 🎯
+    title: 图解丰富
+    details: 大量架构图、流程图、类层次图，让抽象概念可视化
+  - icon: ⚙️
+    title: 核心抽象
+    details: 深入解析 Runnable 接口、LCEL 表达式语言、消息系统等核心设计
+  - icon: 🌙
+    title: 暗色模式
+    details: 支持亮色/暗色主题切换，舒适阅读体验
 
-<div class="vp-doc">
+---
 
-### 🚀 入门指南
-- [项目概览](./guide/getting-started.md) — 技术栈、核心依赖、架构概览
-- [源码结构](./guide/structure.md) — Monorepo 组织、核心包结构
-- [开发调试](./guide/development.md) — 环境搭建、调试技巧
+## 📖 为什么学习 LangChainJS 源码？
 
-### 🏗️ 核心架构
-- [架构总览](./architecture/overview.md) — 分层架构设计
-- [Monorepo 结构](./architecture/monorepo.md) — 包组织与依赖关系
-- [LangChain Core](./architecture/langchain-core.md) — 核心抽象层
+<div class="why-learn">
 
-### 🔄 LCEL (LangChain Expression Language)
-- [LCEL 总览](./lcel/overview.md) — 表达式语言设计理念
-- [Runnable 接口](./lcel/runnable-interface.md) — 核心抽象
-- [RunnableSequence](./lcel/runnable-sequence.md) — 链式组合
-- [RunnableParallel](./lcel/runnable-parallel.md) — 并行执行
-- [流式处理](./lcel/streaming.md) — 实时响应
+**很多同学有这样的困惑：**
 
-### 🧩 核心组件
-- [组件总览](./components/overview.md) — 60+ 核心抽象
-- [语言模型](./components/language-models.md) — LLM/Chat Model 架构
-- [提示模板](./components/prompts.md) — Prompt 工程系统
-- [消息系统](./components/messages.md) — 消息类型与处理
-- [Agent 系统](./components/agents.md) — ReAct/Plan-and-Execute
+- LangChain 能用，但不知道 LCEL 怎么实现的
+- Runnable 接口到底有什么作用？
+- LangChain 的架构设计为什么这样组织？
+- 如何自定义组件和集成新模型？
 
-### 🔌 集成与工具
-- [回调系统](./integrations/callbacks.md) — CallbackManager 机制
-- [追踪系统](./integrations/tracers.md) — LangSmith 集成
-- [提供商集成](./integrations/providers/) — OpenAI/Anthropic/35+
+**学习源码能帮你：**
+
+1. ✅ 理解 LangChain 的设计理念，写出更优雅的 AI 应用代码
+2. ✅ 掌握 LCEL 表达式语言的本质，灵活组合各种组件
+3. ✅ 信心满满地使用新特性和集成新模型
+4. ✅ 甚至成为 LangChain 贡献者
 
 </div>
 
-## 🎯 核心概念速查
+## 🗺️ 学习路线
 
 ```
-LangChainJS 分层架构：
-
-┌─────────────────────────────────────────────┐
-│  应用层 (Application)                        │
-│  ├── Chains (Legacy)                         │
-│  ├── Agents                                    │
-│  └── LCEL Pipelines                           │
-├─────────────────────────────────────────────┤
-│  LangChain (libs/langchain)                 │
-│  ├── 高级抽象与工厂函数                       │
-│  └── 预构建 Chain 实现                        │
-├─────────────────────────────────────────────┤
-│  LangChain Core (libs/langchain-core)       │
-│  ├── BaseLanguageModel                       │
-│  ├── Runnable Interface                      │
-│  ├── Messages & Prompts                      │
-│  ├── Callbacks & Tracing                     │
-│  └── Utilities                               │
-├─────────────────────────────────────────────┤
-│  Providers (libs/providers/*)               │
-│  ├── OpenAI, Anthropic, Google             │
-│  ├── Vector Stores (35+)                   │
-│  └── Document Loaders                        │
-└─────────────────────────────────────────────┘
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   指南篇    │ ──► │   架构篇    │ ──► │   LCEL 篇   │
+│  入门准备   │     │  设计思想   │     │ 表达式语言  │
+└─────────────┘     └─────────────┘     └─────────────┘
+                                              │
+                                              ▼
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   集成篇    │ ◄── │   组件篇    │ ◄── │  进阶主题  │
+│  提供商集成 │     │  核心组件   │     │  高级用法  │
+└─────────────┘     └─────────────┘     └─────────────┘
 ```
 
-```
-LCEL 执行流程：
+## 📋 内容概览
 
-Input
-  │
-  ▼  invoke()
-Runnable
-  │
-  ├──▶ RunnableSequence (顺序执行)
-  │       ├── Step 1
-  │       ├── Step 2
-  │       └── Step 3
-  │
-  ├──▶ RunnableParallel (并行执行)
-  │       ├── Branch A
-  │       └── Branch B
-  │
-  └──▶ RunnableBranch (条件分支)
-          ├── Condition 1 → Runnable A
-          └── Condition 2 → Runnable B
-                │
-                ▼
-              Output
-```
+### 指南篇
+学习前的准备工作，包括环境搭建、调试方法、源码结构等
 
-## 📝 版本信息
+### 架构篇
+理解 LangChainJS 为什么这样设计，Monorepo 架构、核心抽象层、包依赖关系等
 
-| 项目 | 版本 |
-|------|------|
-| LangChainJS | 最新源码 |
-| langchain-core | 0.3.x |
-| langchain | 0.3.x |
-| 提供商集成 | 35+ |
+### LCEL 篇
+深入 LangChain 表达式语言，Runnable 接口、Sequence、Parallel、Map 等核心组件
 
-## 🌐 在线阅读
+### 组件篇
+逐行分析语言模型、消息系统、提示模板、嵌入模型、向量存储等核心功能
 
-- [GitHub Pages](https://xuyuxiong.github.io/langchainjs-source-code-analysis/)
+### 集成篇
+OpenAI、Anthropic 等提供商集成详解，以及如何自定义集成
 
-## 📄 License
+## 👥 谁适合学习？
 
-MIT
+- ✅ 有 1-2 年 LangChain 使用经验
+- ✅ 熟悉 JavaScript/TypeScript
+- ✅ 对 LLM 应用开发有热情
+- ✅ 愿意投入时间深入学习
+
+## 📝 关于本项目
+
+本项目系统性解析 LangChainJS 源码架构和核心实现。
+
+相比其他资料，本项目的特点：
+- 🆕 **内容完整**：37 篇文档覆盖 LangChainJS 核心模块
+- 📊 **图解更多**：大量可视化架构图和类层次图
+- ⚙️ **深度解析**：详细解析 LCEL 表达式语言和 Runnable 接口
+- 📱 **现代化体验**：响应式设计、暗色模式、代码高亮
+
+<div class="action-buttons">
+  <a href="/langchainjs-source-code-analysis/guide/getting-started.html" class="btn-get-started">→ 开始学习</a>
+</div>
+
+<style>
+.why-learn {
+  background: var(--vp-c-bg-soft);
+  border-radius: 8px;
+  padding: 24px;
+  margin: 24px 0;
+}
+
+.action-buttons {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.btn-get-started {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--vp-c-brand);
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 10px 16px;
+  border: 2px solid var(--vp-c-brand);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-get-started:hover {
+  background: var(--vp-c-brand);
+  color: #fff;
+  transform: translateX(4px);
+}
+</style>

@@ -1,142 +1,239 @@
 # LangChainJS 源码深度解析
 
-> 深入剖析 LangChainJS 架构、LCEL (LangChain Expression Language)、Agent 系统与 35+ 提供商集成实现原理
+> LangChainJS 完整源码学习指南 - 从 LCEL 到 Agent 系统
 
-## 🌐 在线阅读
+[![Status](https://img.shields.io/badge/status-complete-brightgreen)](https://github.com/xuyuxiong/langchainjs-source-code-analysis)
+[![LangChain](https://img.shields.io/badge/LangChain-0.3+-1c1c1c)](https://js.langchain.com)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Chapters](https://img.shields.io/badge/chapters-37-orange)](https://xuyuxiong.github.io/langchainjs-source-code-analysis/)
 
-- [GitHub Pages](https://xuyuxiong.github.io/langchainjs-source-code-analysis/)
+---
 
-## 🚀 本地开发
+## 📖 项目简介
+
+本项目是一本完整的 LangChainJS 源码学习指南，共 **37 章**，深入解析 LCEL 表达式语言、Runnable 接口、消息系统、向量存储等核心机制。
+
+相比其他教程，本项目的特点：
+- 🔍 **源码级深度** — 逐行分析核心源码，不仅讲"是什么"，更讲"为什么"
+- 📊 **架构图丰富** — 每章配备类层次图、流程图、模块关系图
+- 🔗 **LangChainJS 0.3+** — 覆盖 LCEL、Runnable 接口、Agent 系统等最新特性
+- 🧪 **示例完整** — 每章包含可运行示例、最佳实践、常见问题
+- 📱 **暗色模式** — VitePress 驱动，支持亮色/暗色切换
+
+👉 **在线阅读**：[https://xuyuxiong.github.io/langchainjs-source-code-analysis/](https://xuyuxiong.github.io/langchainjs-source-code-analysis/)
+
+---
+
+## ✅ 完成情况
+
+| 部分 | 章节数 | 状态 |
+|------|--------|------|
+| 📘 指南篇 | 3/3 | ✅ 已完成 |
+| 📗 架构篇 | 4/4 | ✅ 已完成 |
+| 🔗 LCEL 篇 | 9/9 | ✅ 已完成 |
+| 🧩 组件篇 | 13/13 | ✅ 已完成 |
+| 🔌 集成篇 | 8/8 | ✅ 已完成 |
+| **总计** | **37/37** | **✅ 全部完成** |
+
+---
+
+## 📚 内容目录
+
+### 📘 指南篇 — 入门准备
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 1 | 项目概览 | 技术栈、核心特性 |
+| 2 | 源码结构 | Monorepo 布局、包组织 |
+| 3 | 开发调试 | 环境搭建、调试技巧、测试指南 |
+
+### 📗 架构篇 — 整体架构
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 4 | 架构总览 | 分层设计、核心抽象 |
+| 5 | Monorepo 结构 | libs/、包依赖 |
+| 6 | LangChain Core | Runnable 接口、BaseChatModel |
+| 7 | 包依赖关系 | @langchain/core、提供商包 |
+
+### 🔗 LCEL 篇 — 表达式语言
+
+**核心接口**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 8 | LCEL 总览 | 设计理念、并行执行 |
+| 9 | Runnable 接口 | invoke、batch、stream、bind |
+
+**组合组件**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 10 | RunnableSequence | 顺序链、管道组合 |
+| 11 | RunnableParallel | 并行执行、多分支 |
+| 12 | RunnableMap | 字段映射、输入输出转换 |
+| 13 | RunnableLambda | 自定义函数包装 |
+| 14 | RunnableBranch | 条件分支、路由 |
+
+**高级主题**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 15 | 参数绑定 | bind、部分应用 |
+| 16 | 流式处理 | 流式生成、增量输出 |
+
+### 🧩 组件篇 — 核心组件
+
+**基础组件（4 章）**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 17 | 组件总览 | 60+ 核心抽象 |
+| 18 | 语言模型 | BaseLLM、BaseChatModel、ChatOpenAI |
+| 19 | 消息系统 | HumanMessage、AIMessage、SystemMessage |
+| 20 | 提示模板 | PromptTemplate、ChatPromptTemplate |
+
+**数据处理（4 章）**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 21 | 嵌入模型 | Embeddings、向量嵌入 |
+| 22 | 向量存储 | VectorStore、相似度搜索 |
+| 23 | 输出解析器 | StructuredOutputParser、JSON 解析 |
+| 24 | 工具系统 | Tool、Tool Calling、Zod Schema |
+
+**高级组件（5 章）**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 25 | 记忆管理 | BufferMemory、SummaryMemory |
+| 26 | 文档加载器 | TextLoader、PDFLoader、WebLoader |
+| 27 | 文本分割器 | RecursiveCharacter、MarkdownTextSplitter |
+| 28 | 检索器 | BaseRetriever、向量检索 |
+| 29 | Agent 机制 | AgentExecutor、规划与执行 |
+
+### 🔌 集成篇 — 提供商集成
+
+**核心系统（4 章）**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 30 | 回调系统 | CallbackManager、事件处理 |
+| 31 | 追踪器 | LangSmith、跟踪调试 |
+| 32 | 缓存系统 | BaseCache、LLM 缓存 |
+| 33 | KV 存储 | BaseStore、键值存储 |
+
+**提供商集成（4 章）**
+
+| # | 章节 | 关键词 |
+|---|------|--------|
+| 34 | OpenAI 集成 | ChatOpenAI、OpenAIEmbeddings |
+| 35 | Anthropic 集成 | ChatAnthropic、Claude |
+| 36 | 其他 LLM | Cohere、Google、HuggingFace |
+| 37 | 向量数据库 | Pinecone、Supabase、PGVector |
+
+---
+
+## 🚀 快速开始
 
 ```bash
+# 克隆项目
+git clone https://github.com/xuyuxiong/langchainjs-source-code-analysis.git
+cd langchainjs-source-code-analysis
+
 # 安装依赖
 npm install
 
 # 启动开发服务器
 npm run docs:dev
+```
 
-# 构建静态站点
+访问 http://localhost:5173/langchainjs-source-code-analysis/
+
+```bash
+# 构建静态文件
 npm run docs:build
 
 # 预览构建结果
 npm run docs:preview
 ```
 
-## 📚 目录结构
+---
 
-### 入门指南
-- [项目概览](docs/guide/getting-started.md) — 技术栈、核心依赖、架构概览
-- [源码结构](docs/guide/structure.md) — Monorepo 组织、核心包结构
-- [开发调试](docs/guide/development.md) — 环境搭建、调试技巧
+## 🛠️ 技术栈
 
-### 核心架构
-- [架构总览](docs/architecture/overview.md) — 分层架构设计
-- [Monorepo 结构](docs/architecture/monorepo.md) — 包组织与依赖关系
-- [LangChain Core](docs/architecture/langchain-core.md) — 核心抽象层
-- [包依赖关系](docs/architecture/dependencies.md) — 依赖图分析
-
-### LCEL (LangChain Expression Language)
-- [LCEL 总览](docs/lcel/overview.md) — 表达式语言设计理念
-- [Runnable 接口](docs/lcel/runnable-interface.md) — 核心抽象
-- [RunnableSequence](docs/lcel/runnable-sequence.md) — 链式组合
-- [RunnableParallel](docs/lcel/runnable-parallel.md) — 并行执行
-- [RunnableMap](docs/lcel/runnable-map.md) — 映射转换
-- [RunnableLambda](docs/lcel/runnable-lambda.md) — 自定义函数
-- [RunnableBranch](docs/lcel/runnable-branch.md) — 条件分支
-- [绑定与配置](docs/lcel/binding-config.md) — bind 机制
-- [流式处理](docs/lcel/streaming.md) — 实时响应
-
-### 核心组件
-- [组件总览](docs/components/overview.md) — 60+ 核心抽象
-- [语言模型](docs/components/language-models.md) — LLM/Chat Model 架构
-- [提示模板](docs/components/prompts.md) — Prompt 工程系统
-- [消息系统](docs/components/messages.md) — 消息类型与处理
-- [输出解析器](docs/components/output-parsers.md) — 结构化输出
-- [嵌入模型](docs/components/embeddings.md) — Embeddings 接口
-- [向量存储](docs/components/vectorstores.md) — VectorStore 抽象
-- [Agent 系统](docs/components/agents.md) — ReAct/Plan-and-Execute
-- [工具定义](docs/components/tools.md) — Tool 接口与实现
-- [记忆系统](docs/components/memory.md) — 对话历史管理
-- [文档加载器](docs/components/document-loaders.md) — 文档解析
-- [文本分割器](docs/components/text-splitters.md) — 分块策略
-- [检索器](docs/components/retrievers.md) — 向量检索
-
-### 回调与追踪
-- [回调系统](docs/integrations/callbacks.md) — CallbackManager 机制
-- [追踪系统](docs/integrations/tracers.md) — LangSmith 集成
-
-### 存储与缓存
-- [缓存系统](docs/integrations/caches.md) — 结果缓存
-- [存储抽象](docs/integrations/stores.md) — KV/File Store
-
-### 提供商集成
-- [OpenAI](docs/integrations/providers/openai.md)
-- [Anthropic](docs/integrations/providers/anthropic.md)
-- [其他 LLM](docs/integrations/providers/llms.md)
-- [向量数据库](docs/integrations/providers/vectorstores.md)
-
-## 🔑 核心概念速查
-
-```
-LangChainJS 架构分层：
-
-┌─────────────────────────────────────────────┐
-│  应用层 (Application)                        │
-│  ├── Chains (Legacy)                         │
-│  ├── Agents                                    │
-│  └── LCEL Pipelines                           │
-├─────────────────────────────────────────────┤
-│  LangChain (libs/langchain)                 │
-│  ├── 高级抽象与工厂函数                       │
-│  └── 预构建 Chain 实现                        │
-├─────────────────────────────────────────────┤
-│  LangChain Core (libs/langchain-core)       │
-│  ├── Runnable Interface                      │
-│  ├── BaseLanguageModel                       │
-│  ├── Messages & Prompts                      │
-│  ├── Output Parsers                          │
-│  ├── Callbacks & Tracing                     │
-│  └── VectorStores                            │
-├─────────────────────────────────────────────┤
-│  Providers (libs/providers/*)               │
-│  ├── OpenAI, Anthropic, Google             │
-│  ├── Vector Stores (Pinecone, Chroma, etc.)  │
-│  └── Document Loaders                        │
-└─────────────────────────────────────────────┘
-```
-
-```
-LCEL 执行流程：
-
-Input
-  │
-  ▼  invoke()
-Runnable
-  │
-  ├──▶ RunnableSequence ──▶ 顺序执行
-  │       [Step1] → [Step2] → [Step3]
-  │
-  ├──▶ RunnableParallel ──▶ 并行执行
-  │       ├── Branch A
-  │       └── Branch B
-  │
-  └──▶ RunnableBranch ──▶ 条件分支
-          Condition? ──▶ Runnable A
-          Condition? ──▶ Runnable B
-                │
-                ▼
-              Output
-```
-
-## 📝 版本信息
-
-| 项目 | 版本 |
+| 项目 | 技术 |
 |------|------|
-| LangChainJS 源码 | 最新 |
-| langchain-core | 0.3.x |
-| langchain | 0.3.x |
-| 提供商集成 | 35+ |
+| 文档框架 | [VitePress](https://vitepress.dev) |
+| 构建工具 | Vite |
+| 代码高亮 | Shiki |
+| 图表 | ASCII 文本图 + Mermaid |
+| 部署 | GitHub Actions + GitHub Pages |
 
-## 📄 License
+---
 
-MIT
+## 📁 项目结构
+
+```
+langchainjs-source-code-analysis/
+├── docs/
+│   ├── .vitepress/          # VitePress 配置
+│   │   └── config.mts       # 侧边栏、导航栏配置
+│   ├── guide/               # 📘 指南篇 (3 章)
+│   ├── architecture/        # 📗 架构篇 (4 章)
+│   ├── lcel/                # 🔗 LCEL 篇 (9 章)
+│   ├── components/          # 🧩 组件篇 (13 章)
+│   ├── integrations/        # 🔌 集成篇 (8 章)
+│   │   ├── providers/       #   提供商集成 (4 章)
+│   ├── index.md             # 首页
+│   └── README.md
+├── .github/
+│   └── workflows/
+│       └── deploy-gh-pages.yml  # GitHub Actions 自动部署
+├── package.json
+└── README.md
+```
+
+---
+
+## 🗺️ 学习路线
+
+```
+指南篇(入门准备) → 架构篇(设计思想) → LCEL 篇(表达式语言)
+    → 组件篇 (核心组件) → 集成篇 (提供商集成)
+```
+
+建议按顺序阅读，每章包含：
+- 📊 **架构图** — 类层次结构和数据流
+- 🔧 **源码解析** — 逐行分析核心实现
+- 💡 **关键细节** — 容易忽略的实现要点
+- 📖 **实战示例** — 可运行的代码示例
+- 🐛 **常见问题** — FAQ 解答
+- ✅ **最佳实践** — 推荐用法和陷阱
+
+---
+
+## 🎯 适合人群
+
+- ✅ 有 1-2 年 LangChain 使用经验，想深入理解原理
+- ✅ 熟悉 JavaScript/TypeScript 基础
+- ✅ 对 LLM 应用开发有热情
+- ✅ 准备面试或技术分享，需要源码级理解
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+## 📄 许可证
+
+[MIT License](LICENSE)
+
+---
+
+## 👋 关于作者
+
+本项目由 [xuyuxiong](https://github.com/xuyuxiong) 创作并维护。
+
+如果你从中受益，欢迎给项目一个 ⭐ Star！
