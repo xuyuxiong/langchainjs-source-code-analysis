@@ -1,38 +1,61 @@
-# 消息系统深度解析
+# 消息系统
 
-> 19 种消息类型与多模态内容支持
+> 对话消息的完整类型体系
 
 ## 📋 概述
 
-LangChainJS 的消息系统提供了统一的对话消息抽象，支持文本、图像、音频等多种内容格式。
+消息系统定义了 LangChainJS 中所有消息类型的统一接口和实现，是与 LLM 交互的基础数据结构。
 
 **源码位置**: `libs/langchain-core/src/messages/`
 
-## 🏗️ 类层次结构
+**文件数**: 约 14 个主要文件
 
-**文件数**: 19 个
+## 🏗️ 类层次结构
 
 ```
 Serializable
     │
-    └── parseBaseMessageFields()
+    └── BaseMessage<TStructure, TRole>
             │
-            └── BaseMessage
-                    │
-                    ├── BaseMessageChunk (可流式分块)
-                    │       │
-                    │       ├── HumanMessageChunk
-                    │       ├── AIMessageChunk
-                    │       ├── SystemMessageChunk
-                    │       └── ...
-                    │
-                    ├── HumanMessage (用户消息)
-                    ├── AIMessage (AI 回复)
-                    ├── SystemMessage (系统提示)
-                    ├── ToolMessage (工具结果)
-                    ├── FunctionMessage (函数调用 - 已废弃)
-                    ├── ChatMessage (通用角色)
-                    └── RemoveMessage (删除消息)
+            ├── BaseMessageChunk (支持流式合并)
+            │       │
+            │       ├── HumanMessageChunk
+            │       ├── AIMessageChunk
+            │       ├── SystemMessageChunk
+            │       ├── FunctionMessageChunk
+            │       └── ToolMessageChunk
+            │
+            ├── HumanMessage
+            ├── AIMessage (包含 tool_calls 支持)
+            ├── SystemMessage
+            ├── FunctionMessage
+            └── ToolMessage
+```
+
+## 📁 源码文件结构
+
+```
+libs/langchain-core/src/messages/
+├── base.ts              # BaseMessage 抽象基类
+├── message.ts           # Message 接口和类型定义
+├── human.ts             # HumanMessage
+├── ai.ts                # AIMessage (含 Tool Calls 支持)
+├── system.ts            # SystemMessage
+├── function.ts          # FunctionMessage
+├── tool.ts              # ToolMessage 和 ToolCall 类型
+├── chat.ts              # Chat 相关辅助函数
+├── format.ts            # 消息格式化
+├── content/             # 内容块类型
+│   ├── base.ts
+│   ├── data.ts
+│   └── index.ts
+├── block_translators/   # 不同格式的块转换
+│   ├── anthropic.ts
+│   ├── openai.ts
+│   └── data.ts
+├── transformers.ts      # 消息转换器
+├── utils.ts             # 工具函数
+└── index.ts             # 导出入口
 ```
 
 ## 🔑 BaseMessage 核心接口
@@ -40,600 +63,10 @@ Serializable
 **源文件**: `libs/langchain-core/src/messages/base.ts`
 
 ```typescript
-abstract class BaseMessage extends Serializable {
-  // ========== 核心属性 ==========
-  
-  /**
-   * 消息内容
-   * 支持单一文本或复杂内容数组
-   */
-  content: string | ArrayContent;
-  
-  /**
-   * 消息角色
-   * 'user' | 'assistant' | 'system' | 'generic'
-   */
-  abstract _getType(): MessageType;
-  
-  /**
-   * 消息名称 (可选)
-   */
-  name?: string;
-  
-  /**
-   * 额外元数据
-   */
-  additional_kwargs: Record<string, any>;
-  
-  /**
-   * 响应元数据 (AI 消息)
-   */
-  response_metadata?: Record<string, any>;
-  
-  /**
-   * 唯一 ID
-   */
-  id?: string;
-  
-  // ========== 工具方法 ==========
-  
-  /**
-   * 内容是否为字符串
-   */
-  isTextContent(): boolean {
-    return typeof this.content === 'string';
-  }
-  
-  /**
-   * 转换为 OpenAI 格式
-   */
-  toOpenAIToolCall?(): OpenAIToolCall;
-  
-  /**
-   * 添加内容块
-   */
-  concat(chunk: BaseMessageChunk): this;
-}
-```
-
-## 📊 消息类型详解
-
-### 1. HumanMessage (用户消息)
-
-**源文件**: `libs/langchain-core/src/messages/human.ts`
-
-```typescript
-class HumanMessage extends BaseMessage {
-  static lc_name() {
-    return 'HumanMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'human';
-  }
-}
-
-// 使用示例
-(new HumanMessage({
-  content: 'Hello!',
-  name?: 'John',
-  additional_kwargs: { ... }
-}));
-```
-
-### 2. AIMessage (AI 回复)
-
-**源文件**: `libs/langchain-core/src/messages/ai.ts`
-
-```typescript
-class AIMessage extends BaseMessage {
-  static lc_name() {
-    return 'AIMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'ai';
-  }
-  
-  // ========== 特有属性 ==========
-  
-  /**
-   * 工具调用列表
-   */
-  tool_calls?: ToolCall[];
-  
-  /**
-   * 无效的工具调用
-   */
-  invalid_tool_calls?: InvalidToolCall[];
-  
-  /**
-   * 使用统计
-   */
-  usage_metadata?: UsageMetadata;
-  
-  /**
-   * 被拒绝的原因 (内容过滤)
-   */
-  refusal?: string;
-}
-
-// 使用示例
-new AIMessage({
-  content: 'Hello! I am...'
-});
-```
-
-**ToolCall 结构**:
-```typescript
-interface ToolCall {
-  name: string;
-  args: Record<string, any>;
-  id?: string;
-  type: 'tool_call';
-}
-```
-
-**InvalidToolCall 结构**:
-```typescript
-interface InvalidToolCall {
-  name?: string;
-  args?: string;
-  error?: string;
-  type: 'invalid_tool_call';
-}
-```
-
-### 3. SystemMessage (系统提示)
-
-**源文件**: `libs/langchain-core/src/messages/system.ts`
-
-```typescript
-class SystemMessage extends BaseMessage {
-  static lc_name() {
-    return 'SystemMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'system';
-  }
-}
-
-// 使用示例
-new SystemMessage({
-  content: 'You are a helpful assistant.'
-});
-```
-
-### 4. ToolMessage (工具结果)
-
-**源文件**: `libs/langchain-core/src/messages/tool.ts`
-
-```typescript
-class ToolMessage extends BaseMessage {
-  static lc_name() {
-    return 'ToolMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'tool';
-  }
-  
-  // ========== 特有属性 ==========
-  
-  /**
-   * 关联的工具调用 ID
-   */
-  tool_call_id: string;
-  
-  /**
-   * 执行状态
-   */
-  status?: 'success' | 'error';
-}
-
-// 使用示例
-new ToolMessage({
-  content: JSON.stringify({ result: '...' }),
-  tool_call_id: 'call_abc123',
-  status: 'success'
-});
-```
-
-### 5. ChatMessage (通用角色)
-
-**源文件**: `libs/langchain-core/src/messages/chat.ts`
-
-```typescript
-class ChatMessage extends BaseMessage {
-  static lc_name() {
-    return 'ChatMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'generic';
-  }
-  
-  // ========== 特有属性 ==========
-  
-  /**
-   * 自定义角色
-   */
-  role: string;
-}
-
-// 使用示例
-new ChatMessage({
-  content: '...',
-  role: 'developer'  // 自定义角色
-});
-```
-
-### 6. FunctionMessage (已废弃)
-
-**源文件**: `libs/langchain-core/src/messages/function.ts`
-
-⚠️ **已废弃**: 使用 ToolMessage 替代
-
-```typescript
-class FunctionMessage extends BaseMessage {
-  static lc_name() {
-    return 'FunctionMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'function';
-  }
-  
-  /**
-   * 函数名称
-   */
-  name: string;
-}
-```
-
-### 7. RemoveMessage (删除消息)
-
-**源文件**: `libs/langchain-core/src/messages/remove.ts`
-
-```typescript
-class RemoveMessage extends BaseMessage {
-  static lc_name() {
-    return 'RemoveMessage';
-  }
-  
-  _getType(): MessageType {
-    return 'remove';
-  }
-  
-  /**
-   * 要删除的消息 ID
-   */
-  id: string;
-}
-
-// 从 2.0 版本开始支持
-```
-
-## 🖼️ 多模态内容支持
-
-### ArrayContent 结构
-
-```typescript
-type ArrayContent = (
-  | TextContentPart
-  | ImageContentPart
-  | AudioContentPart
-  | VideoContentPart
-  | ToolUseContentPart
-  | ToolResultContentPart
-  | ReasoningContentPart
-)[];
-```
-
-### 内容块类型
-
-#### TextContentPart
-
-```typescript
-interface TextContentPart {
-  type: 'text';
-  text: string;
-  source_type?: 'text';
-}
-
-// 使用示例
-const message = new HumanMessage({
-  content: [
-    { type: 'text', text: 'Describe this image:' }
-  ]
-});
-```
-
-#### ImageContentPart
-
-```typescript
-interface ImageContentPart {
-  type: 'image_url';
-  
-  image_url: {
-    url: string;
-    detail?: 'auto' | 'low' | 'high';
-  };
-  
-  source_type?: 'image';
-}
-
-// 使用示例
-const message = new HumanMessage({
-  content: [
-    { type: 'text', text: 'What is in this image?' },
-    {
-      type: 'image_url',
-      image_url: {
-        url: 'https://example.com/image.jpg',
-        detail: 'high'
-      }
-    }
-  ]
-});
-```
-
-#### AudioContentPart
-
-```typescript
-interface AudioContentPart {
-  type: 'input_audio';
-  
-  input_audio: {
-    data: string;        // Base64 编码
-    format: 'wav' | 'mp3';
-  };
-  
-  source_type?: 'audio';
-}
-```
-
-#### VideoContentPart
-
-```typescript
-interface VideoContentPart {
-  type: 'input_video';
-  
-  input_video: {
-    url?: string;
-    base64?: string;
-    format?: string;
-  };
-  
-  source_type?: 'video';
-}
-```
-
-#### ToolUseContentPart
-
-```typescript
-interface ToolUseContentPart {
-  type: 'tool_use';
-  
-  id: string;
-  name: string;
-  input: Record<string, any>;
-}
-```
-
-#### ToolResultContentPart
-
-```typescript
-interface ToolResultContentPart {
-  type: 'tool_result';
-  
-  tool_use_id: string;
-  content: string | ArrayContent;
-  is_error?: boolean;
-}
-```
-
-#### ReasoningContentPart
-
-```typescript
-interface ReasoningContentPart {
-  type: 'reasoning';
-  
-  reasoning: string;
-  data?: string;
-}
-```
-
-## 🔄 消息转换
-
-### 转换为 OpenAI 格式
-
-**源文件**: `libs/langchain-core/src/messages/transformers.ts`
-
-```typescript
-import { getBufferString, convertToOpenAITool } from '@langchain/core/messages';
-
-// 获取消息字符串表示
-const string = getBufferString(messages);
-
-// 转换为 OpenAI 格式
-const openaiMessages: OpenAILikeMessage[] = [
-  {
-    role: 'user',
-    content: [
-      { type: 'text', text: 'Hello' },
-      { type: 'image_url', image_url: { url: '...' } }
-    ]
-  }
-];
-
-// 转换为 Anthropic 格式
-const anthropicMessages: AnthropicMessage[] = [
-  {
-    role: 'user',
-    content: [
-      { type: 'text', text: '...' },
-      { type: 'image', source: { ... } }
-    ]
-  }
-];
-```
-
-### toOpenAIToolCall
-
-```typescript
-const message = new AIMessage({
-  content: '',
-  tool_calls: [
-    {
-      name: 'search',
-      args: { query: 'weather' },
-      id: 'call_abc123',
-      type: 'tool_call'
-    }
-  ]
-});
-
-const toolCall = message.toOpenAIToolCall();
-```
-
-## 📝 使用示例
-
-### 示例 1: 基础对话
-
-```typescript
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
-
-const messages = [
-  new SystemMessage('You are a helpful assistant.'),
-  new HumanMessage('What is LangChain?'),
-  new AIMessage('LangChain is a framework...'),
-  new HumanMessage('Can you explain more?')
-];
-```
-
-### 示例 2: 多模态输入
-
-```typescript
-import { HumanMessage } from '@langchain/core/messages';
-
-const message = new HumanMessage({
-  content: [
-    { type: 'text', text: 'Describe this image' },
-    {
-      type: 'image_url',
-      image_url: {
-        url: 'https://example.com/image.jpg',
-        detail: 'high'
-      }
-    }
-  ]
-});
-```
-
-### 示例 3: 工具调用处理
-
-```typescript
-const model = new ChatOpenAI({ modelName: 'gpt-4-turbo' });
-
-const response = await model.invoke([
-  new HumanMessage('What is the weather in Tokyo?')
-]);
-
-// 检查工具调用
-if (response.tool_calls?.length ) {
-  const toolCall = response.tool_calls[0];
-  
-  // 创建 ToolMessage
-  const toolMessage = new ToolMessage({
-    content: JSON.stringify({ temperature: 25 }),
-    tool_call_id: toolCall.id,
-    status: 'success'
-  });
-  
-  // 继续对话
-  const finalResponse = await model.invoke([
-    new HumanMessage('What is the weather in Tokyo?'),
-    response,  // AIMessage with tool_calls
-    toolMessage
-  ]);
-}
-```
-
-### 示例 4: 流式分块处理
-
-```typescript
-import *));
-
-const stream = await model.stream(messages);
-const chunks: BaseMessageChunk[] = [];
-
-for await (const chunk of stream) {
-  chunks.push(chunk);
-  process.stdout.write(chunk.content);
-}
-
-// 合并所有分块
-const fullChunks.push(chunk);
-const fullChunks = stream);
-
-const fullChunk = chunks.reduce строить от                         0_chunks = chunks.chunks.push(chunk);
-const fullMessage = chunks[0].concat(...chunks.slice.build1));
-```
-
-### 示例 5: 消息序列化
-
-```typescript
-// 序列化
-const json = message.toJSON();
-
-// 反序列化
-const restored = BaseMessage.fromJSON(json);
-
-// 消息字典表示
-const dict = message.toDict();
-```
-
-## 💡 最佳实践
-
-### ✅ 推荐
-
-```typescript
-// 1. 使用专门的 Message 类型
-new HumanMessage({ content: '...' }); // ✅
-
-// 2. 使用 content 数组支持多模态
-new HumanMessage({
-  content: [
-    { type: 'text', text: '...' },
-    { type: 'image_url', image_url: { ... } }
-  ]
-}); // ✅
-
-// 3. 保持合理的对话历史长度
-const messages = conversation.slice(-10); // 最近 10 条 // ✅
-```
-
-### ❌ 不推荐
-
-```typescript
-// 1. 避免手动构造复杂结构
-const  messagesmanual = [
-  {
-    static {
-    role: 'user',
-    content: '...'
-  }
-]; // ❌ 容易出错
-
-// 应使用消息类
-new HumanMessage({ content: '...' }); // ✅
-
-// 2. 避免忽略 tool_message_id
-new Too  (
-```
-
----
-
-**源码参考**: `libs/langchain-core/src/messages/` (19 个文件)
+// 消息内容类型
+type MessageContent = string | Array<ContentBlock>;
+
+abstract class BaseMessage<
+  TStructure extends MessageStructure = MessageStructure,
+  TRole extends MessageType = MessageType
+> extends Serializable {\n  \n  // ========== 核心属性 ==========\n  \n  /**\n   * 消息内容（字符串或内容块数组）\n   */\n  content: $InferMessageContent<TStructure, TRole>;\n  \n  /**\n   * 附加名称（可选）\n   */\n  name?: string;\n  \n  /**\n   * 响应元数据（headers、logprobs、token counts 等）\n   */\n  response_metadata?: $InferResponseMetadata<TStructure, TRole>;\n  \n  /**\n   * 消息 ID\n   */\n  id?: string;\n  \n  /**\n   * @deprecated 遗留字段，使用 tool_calls\n   */\n  additional_kwargs?: {\n    function_call?: FunctionCall;\n    tool_calls?: OpenAIToolCall[];\n    [key: string]: unknown;\n  };\n  \n  // ========== 抽象方法 ==========\n  \n  /**\n   * 获取消息类型\n   */\n  abstract _getType(): MessageType;\n  \n  // ========== 工具方法 ==========\n  \n  /**\n   * 检查是否为文本内容\n   */\n  isTextContent(): boolean;\n  \n  /**\n   * 转换为 OpenAI ToolCall\n   */\n  toOpenAIToolCall?(): OpenAIToolCall | undefined;\n  \n  /**\n   * 合并消息块\n   */\n  concat(chunk: BaseMessageChunk): this;\n  \n  /**\n   * 序列化为 JSON\n   */\n  toJSON(): any;\n  \n  /**\n   * 转换为字典\n   */\n  toDict(): StoredMessage;\n}\n```\n\n## 🔑 AIMessage 详解\n\n**源文件**: `libs/langchain-core/src/messages/ai.ts`\n\n```typescript\ninterface AIMessageFields<TStructure extends MessageStructure> {\n  content?: $InferMessageContent<TStructure, 'ai'>;\n  name?: string;\n  id?: string;\n  tool_calls?: ToolCall[];\n  invalid_tool_calls?: InvalidToolCall[];\n  additional_kwargs?: { function_call?: FunctionCall };\n  response_metadata?: Record<string, any>;\n}\n\nclass AIMessage<TStructure extends MessageStructure = MessageStructure>\n  extends BaseMessage<TStructure, 'ai'>\n{\n  static lc_name() {\n    return 'AIMessage';\n  }\n  \n  _getType(): MessageType {\n    return 'ai';\n  }\n  \n  /**\n   * 工具调用列表\n   */\n  tool_calls?: ToolCall[];\n  \n  /**\n   * 无效的调用列表\n   */\n  invalid_tool_calls?: InvalidToolCall[];\n  \n  /**\n   * 构造函数支持多种参数形式\n   */\n  constructor(\n    fields: $InferMessageContent<TStructure, 'ai'> | AIMessageFields<TStructure>\n  ) {\n    if (typeof fields === 'string' || Array.isArray(fields)) {\n      // 支持直接传入内容\n      super({ content: fields });\n      this.tool_calls = [];\n      this.invalid_tool_calls = [];\n      this.additional_kwargs = {};\n    } else {\n      // 传入字段对象\n      super(fields);\n      // 处理 tool_calls 转换逻辑...\n    }\n  }\n  \n  /**\n   * 检查是否包含工具调用\n   */\n  get tool_calls(): ToolCall[] {\n    return this.tool_calls ?? [];\n  }\n}\n```\n\n## 📝 使用示例\n\n### 示例 1: 创建消息\n\n```typescript\nimport { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';\n\n// HumanMessage\nconst humanMsg = new HumanMessage('你好！');\nconst humanMsg2 = new HumanMessage({\n  content: '你好！',\n  name: 'user123'\n});\n\n// AIMessage（支持 string 或对象）\nconst aiMsg = new AIMessage('你好，有什么可以帮助你的？');\nconst aiMsg2 = new AIMessage({\n  content: '你好！',\n  tool_calls: []  // 支持 tool_calls\n});\n\n// SystemMessage\nconst sysMsg = new SystemMessage('你是一个有帮助的助手');\n```\n\n### 示例 2: 带 Tool Calls 的 AIMessage\n\n```typescript\nimport { AIMessage } from '@langchain/core/messages';\n\nconst aiMsg = new AIMessage({\n  content: '我来帮你查询天气',\n  tool_calls: [{\n    id: 'call_123',\n    name: 'get_weather',\n    args: { city: '北京' }\n  }]\n});\n\nconsole.log(aiMsg.tool_calls);  // [{ id: 'call_123', ... }]\n```\n\n### 示例 3: 消息合并\n\n```typescript\nimport { AIMessageChunk } from '@langchain/core/messages';\n\n// 流式响应时合并 chunk\nconst chunk1 = new AIMessageChunk({ content: '你好' });\nconst chunk2 = new AIMessageChunk({ content: '，' });\nconst chunk3 = new AIMessageChunk({ content: '世界' });\n\nconst merged = chunk1.concat(chunk2).concat(chunk3);\nconsole.log(merged.content);  // '你好，世界'\n```\n\n### 示例 4: 多模态内容\n\n```typescript\nimport { HumanMessage } from '@langchain/core/messages';\n\n// 文本 + 图片\nconst msg = new HumanMessage({\n  content: [\n    { type: 'text', text: '这张图片是什么？' },\n    {\n      type: 'image',\n      source: {\n        type: 'base64',\n        media_type: 'image/jpeg',\n        data: 'base64_encoded_data'\n      }\n    }\n  ]\n});\n```\n\n### 示例 5: 消息类型检查\n\n```typescript\nimport { HumanMessage, AIMessage } from '@langchain/core/messages';\nimport { isBaseMessage, isMessageType } from '@langchain/core/messages/utils';\n\nconst msg = new HumanMessage('hello');\n\nconsole.log(isBaseMessage(msg));           // true\nconsole.log(isMessageType(msg, 'human'));  // true\nconsole.log(msg._getType());               // 'human'\nconsole.log(msg.isTextContent());          // true/false\n```\n\n## 💡 最佳实践\n\n### ✅ 推荐\n\n```typescript\n// 1. 使用类型安全的构造函数\nconst msg = new HumanMessage({\n  content: 'message',\n  name: 'user'  // ✅ 添加名称\n});\n\n// 2. 正确传递消息数组\nconst messages = [\n  new SystemMessage('You are helpful'),\n  new HumanMessage('Hello'),\n  new AIMessage('Hi there!')\n];\n\n// 3. 使用 AIMessageChunk 处理流式响应\nlet fullMessage = '';\nfor await (const chunk of stream) {\n  fullMessage += chunk.content;\n}\n```\n\n### ❌ 不推荐\n\n```typescript\n// 1. 避免使用 additional_kwargs 传递 tool_calls\nconst msg = new AIMessage({\n  additional_kwargs: {\n    tool_calls: [...]  // ❌ 已废弃\n  }\n});\n// 应该使用:\nconst msg = new AIMessage({\n  tool_calls: [...]  // ✅ 正确\n});\n\n// 2. 避免混合使用 string 和对象\nconst msg = new HumanMessage('content');  // ✅ 或\nconst msg = new HumanMessage({ content: 'content' });  // ✅\n// 不要混用\n```\n\n---\n\n**源码参考**: `libs/langchain-core/src/messages/`（14 个主要文件）

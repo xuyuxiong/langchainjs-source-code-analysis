@@ -1,602 +1,101 @@
-# 向量存储 (VectorStore)
+# 向量存储系统
 
-> 向量相似度搜索与 RAG 核心组件
+> 相似度搜索与向量索引
 
 ## 📋 概述
 
-向量存储负责存储和检索嵌入向量，是实现 RAG (检索增强生成) 的核心组件。
+向量存储负责存储嵌入向量并执行相似度搜索，是 RAG 应用的核心组件。
 
 **源码位置**: `libs/langchain-core/src/vectorstores.ts`
 
-## 🔑 VectorStore 接口
-
-**源文件**: `libs/langchain-core/src/vectorstores.ts`
-
-**代码规模**: ~3,500 行
-
-```typescript
-abstract class VectorStore extends Serializable {
-  // ========== 抽象属性 ==========
-  
-  /**
-   * Embeddings 实例
-   */
-  abstract embeddings: Embeddings;
-  
-  /**
-   * 向量维度 (可选)
-   */
-  vectorDimension?: number;
-  
-  // ========== 抽象方法 ==========
-  
-  /**
-   * 添加向量
-   * @param vectors - 向量数组
-   * @param documents - 对应文档
-   * @param options - 可选配置
-   * @returns 文档 ID 数组
-   */
-  abstract addVectors(
-    vectors: number[][],
-    documents: Document[],
-    options?: AddVectorsOptions
-  ): Promise<string[]>;
-  
-  /**
-   * 添加文档 (自动嵌入)
-   * @param documents - 文档数组
-   * @param options - 可选配置
-   * @returns 文档 ID 数组
-   */
-  abstract addDocuments(
-    documents: Document[],
-    options?: AddVectorsOptions
-  ): Promise<string[]>;
-  
-  // ========== 搜索方法 ==========
-  
-  /**
-   * 相似度搜索 (字符串查询)
-   * @param query - 查询文本
-   * @param k - 返回数量
-   * @param filter - 过滤器
-   * @returns 文档数组
-   */
-  async similaritySearch(
-    query: string,
-    k?: number,
-    filter?: FilterType
-  ): Promise<Document[]> {
-    const results = await this.similaritySearchVectorWithScore(
-      await this.embeddings.embedQuery(query),
-      k,
-      filter
-    );
-    return results.map(result => result[0]);
-  }
-  
-  /**
-   * 相似度搜索带分数
-   * @param query - 查询文本
-   * @param k - 返回数量
-   * @param filter - 过滤器
-   * @returns [文档，分数] 数组
-   */
-  async similaritySearchWithScore(
-    query: string,
-    k?: number,
-    filter?: FilterType
-  ): Promise<[Document, number][]> {
-    return this.similaritySearchVectorWithScore(
-      await this.embeddings.embedQuery(query),
-      k,
-      filter
-    );
-  }
-  
-  /**
-   * 向量相似度搜索
-   * @param query - 查询向量
-   * @param k - 返回数量
-   * @param filter - 过滤器
-   * @returns [文档，分数] 数组
-   */
-  abstract similaritySearchVectorWithScore(
-    query: number[],
-    k?: number,
-    filter?: FilterType
-  ): Promise<[Document, number][]>;
-  
-  // ========== 删除方法 ==========
-  
-  /**
-   * 删除文档
-   */
-  delete?(params: { ids?: string[]; filter?: FilterType }): Promise<void>;
-  
-  // ========== 检索器转换 ==========
-  
-  /**
-   * 转换为检索器
-   * @param options - 检索器配置
-   */
-  asRetriever(options?: VectorStoreRetrieverFields): VectorStoreRetriever<this>;
-}
-```
+**文件数**: 1 个核心文件 + 各提供商实现
 
 ## 🏗️ 类层次结构
 
 ```
 Serializable
     │
-    └── VectorStore (抽象基类)
+    └── VectorStore
             │
-            ├── 内存实现
-            │   └── MemoryVectorStore
-            │
-            ├── 数据库实现
-            │   ├── PineconeStore
-            │   ├── Chroma
-            │   ├── PGVectorStore
-            │   ├── SupabaseVectorStore
-            │   ├── RedisVectorStore
-            │   ├── QdrantVectorStore
-            │   └── ...
-            │
-            └── 云原生实现
-                ├── AWSOpenSearchStore
-                ├── AzureSearchVectorStore
-                └── MongoDBAtlasVectorSearch
+            └── 提供商实现
+                ├── MemoryVectorStore (内存)
+                ├── Pinecone
+                ├── Supabase
+                ├── PGVector
+                └── ...
 ```
 
-## 📊 核心实现详解
+## 🔑 VectorStore 核心接口
 
-### 1. MemoryVectorStore
-
-**源文件**: `libs/langchain/src/vectorstores/memory.ts`
-
-最简单的内存实现，适合原型开发和测试。
+**源文件**: `libs/langchain-core/src/vectorstores.ts`
 
 ```typescript
-class MemoryVectorStore extends VectorStore {
-  declare embeddings: Embeddings;
+abstract class VectorStore<
+  VectorStoreIndexInterface extends IndexInterface = IndexInterface
+> extends Serializable implements VectorStoreInterface {
+  
+  // ========== 类型定义 ==========
   
   /**
-   * 内存存储
+   * Filter 类型（由子类定义）
    */
-  protected memoryVectors: MemoryVector[] = [];
+  FilterType: unknown;
+  
+  // ========== 抽象方法 (子类必须实现) ==========
   
   /**
-   * 相似度计算方式
+   * 添加向量
+   * @param vectors 向量数组
+   * @param documents 对应文档
+   * @param options 选项
+   * @returns 添加的 ID 列表或 void
    */
-  protected similarity: SimilarityFn;
+  abstract addVectors(\n    vectors: number[][],\n    documents: DocumentInterface[],\n    options?: AddDocumentOptions\n  ): Promise<string[] | void>;
   
-  constructor(embeddings: Embeddings, dbConfig?: MemoryVectorStoreConfig) {
-    super(embeddings, dbConfig);
-    this.similarity = dbConfig?.similarity || cosineSimilarity;
-  }
+  /**
+   * 添加文档（自动计算嵌入）
+   * @param documents 文档列表
+   * @param options 选项
+   * @returns 添加的 ID 列表或 void
+   */
+  abstract addDocuments(\n    documents: DocumentInterface[],\n    options?: AddDocumentOptions\n  ): Promise<string[] | void>;
   
-  // ========== 添加方法 ==========
+  /**
+   * 向量相似度搜索（带评分）
+   * @param query 查询向量
+   * @param k 返回数量（必填，无默认值）
+   * @param filter 过滤器（类型为 this["FilterType"]）
+   * @returns [文档，评分] 元组数组
+   */
+  abstract similaritySearchVectorWithScore(\n    query: number[],\n    k: number,\n    filter?: this['FilterType']\n  ): Promise<[DocumentInterface, number][]>;
   
-  async addVectors(
-    vectors: number[][],
-    documents: Document[]
-  ): Promise<string[]> {
-    const ids: string[] = [];
-    
-    for (let i = 0; i < vectors.length; i++) {
-      const id = uuidv4();
-      ids.push(id);
-      
-      this.memoryVectors.push({
-        id,
-        vector: vectors[i],
-        content: documents[i].pageContent,
-        metadata: documents[i].metadata
-      });
-    }
-    
-    return ids;
-  }
+  // ========== 便捷方法（默认实现）==========
   
-  async addDocuments(
-    documents: Document[]
-  ): Promise<string[]> {
-    const texts = documents.map(({ pageContent }) => pageContent);
-    return this.addVectors(
-      await this.embeddings.embedDocuments(texts),
-      documents
-    );
-  }
+  /**
+   * 相似度搜索
+   * @param query 查询文本
+   * @param k 返回数量（默认值：4）
+   * @param filter 过滤器\n   * @param _callbacks 回调（可选）\n   * @returns 文档列表\n   */\n  async similaritySearch(\n    query: string,\n    k = 4,\n    filter: this['FilterType'] | undefined = undefined,\n    _callbacks: Callbacks | undefined = undefined\n  ): Promise<DocumentInterface[]> {\n    const results = await this.similaritySearchVectorWithScore(\n      await this.embeddings.embedQuery(query),\n      k,\n      filter\n    );\n    return results.map(result => result[0]);\n  }
   
-  // ========== 搜索方法 ==========
+  /**
+   * 相似度搜索（带评分）
+   */\n  async similaritySearchWithScore(\n    query: string,\n    k = 4,\n    filter?: this['FilterType']\n  ): Promise<[DocumentInterface, number][]> {\n    const queryEmbedding = await this.embeddings.embedQuery(query);\n    return await this.similaritySearchVectorWithScore(\n      queryEmbedding,\n      k,\n      filter\n    );\n  }
   
-  async similaritySearchVectorWithScore(
-    query: number[],
-    k?: number,
-    filter?: FilterType
-  ): Promise<[Document, number][]> {
-    // 1. 计算所有向量的相似度
-    const filteredMemoryVectors = this._applyFilter(
-      this.memoryVectors,
-      filter
-    );
-    
-    const searches: SimilaritySearch[] = filteredMemoryVectors
-      .map(vector => ({
-        vector,
-        similarity: this.similarity(query, vector.vector)
-      }));
-    
-    // 2. 排序取 Top K
-    searches.sort((a, b) => b.similarity - a.similarity);
-    const topK = searches.slice(0, k);
-    
-    // 3. 构建结果
-    const results: [Document, number][] = topK.map(result => [
-      new Document({
-        pageContent: result.vector.content,
-        metadata: result.vector.metadata
-      }),
-      result.similarity
-    ]);
-    
-    return results;
-  }
+  // ========== 索引管理 ==========\n  \n  /**
+   * 删除文档
+   */\n  async delete(\n    params?: {\n      ids?: string[];\n      filter?: this['FilterType'];\n    }\n  ): Promise<void> {\n    // 默认实现，部分提供商支持\n  }
   
-  // ========== 删除方法 ==========
-  
-  async delete(params: { ids?: string[] }): Promise<void> {
-    if (params.ids) {
-      this.memoryVectors = this.memoryVectors.filter(
-        v => !params.ids?.includes(v.id)
-      );
-    }
-  }
-}
+  /**
+   * 获取索引统计
+   */\n  async indexExists(): Promise<boolean> {\n    return true;\n  }\n  
+  /**\n   * 检查索引是否空\n   */\n  async isIndexEmpty(): Promise<boolean> {\n    return true;\n  }\n}\n
 ```
 
-### 2. PinconeStore
-
-**源文件**: `libs/langchain-pinecone/src/vectorstore.ts`
+## 📊 关键类型定义
 
 ```typescript
-class PineconeStore extends VectorStore {
-  declare embeddings: OpenAIEmbeddings;
-  
-  private index: PineconeIndex;
-  private namespace: string;
-  
-  constructor(embeddings: Embeddings, args: PineconeStoreArgs) {
-    super(embeddings, args);
-    this.index = args.pineconeIndex;
-    this.namespace = args.namespace ?? '';
-  }
-  
-  async addVectors(
-    vectors: number[][],
-    documents: Document[],
-    options?: { ids?: string[] }
-  ): Promise<string[]> {
-    const ids = options?.ids?.length
-      ? options.ids
-      : vectors.map(() => uuidv4());
-    
-    // 构建 Pinecone 请求
-    const records: Record<string, any>[] = vectors.map((vector, i) => ({
-      id: ids[i],
-      values: vector,
-      metadata: {
-        text: documents[i].pageContent,
-        ...documents[i].metadata
-      }
-    }));
-    
-    // 批量上传
-    await this.index.namespace(this.namespace).upsert(records);
-    
-    return ids;
-  }
-  
-  async similaritySearchVectorWithScore(
-    query: number[],
-    k?: number,
-    filter?: PineconeFilter
-  ): Promise<[Document, number][]> {
-    const index = this.index.namespace(this.namespace);
-    
-    const results = await index.query({
-      vector: query,
-      topK: k,
-      filter,
-      includeMetadata: true,
-      includeValues: false
-    });
-    
-    return results.matches.map(match => [
-      new Document({
-        pageContent: match.metadata?.text as string,
-        metadata: this._extractMetadata(match.metadata)
-      }),
-      match.score ?? 0
-    ]);
-  }
-}
-```
-
-### 3. Chroma
-
-**源文件**: `libs/langchain-chroma/src/vectorstores.ts`
-
-```typescript
-class Chroma extends VectorStore {
-  private collection: Collection;
-  
-  constructor(embeddings: Embeddings, args: ChromaLibArgs) {
-    super(embeddings, args);
-    this.collection = args.collection;
-  }
-  
-  async addDocuments(
-    documents: Document[],
-    options?: { ids?: string[] }
-  ): Promise<string[]> {
-    const texts = documents.map(({ pageContent }) => pageContent);
-    const embeddings = await this.embeddings.embedDocuments(texts);
-    
-    return this.addVectors(embeddings, documents, options);
-  }
-  
-  async addVectors(
-    vectors: number[][],
-    documents: Document[],
-    options?: { ids?: string[] }
-  ): Promise<string[]> {
-    const ids = options?.ids?.length
-      ? options.ids
-      : vectors.map(() => uuidv4());
-    
-    const metadatas = documents.map(d => d.metadata);
-    const contents = documents.map(d => d.pageContent);
-    
-    await this.collection.add({
-      ids,
-      embeddings: vectors,
-      metadatas,
-      documents: contents
-    });
-    
-    return ids;
-  }
-  
-  async similaritySearchVectorWithScore(
-    query: number[],
-    k?: number,
-    filter?: ChromaWhere
-  ): Promise<[Document, number][]> {
-    const results = await this.collection.query({
-      queryEmbeddings: [query],
-      nResults: k ?? 10,
-      where: filter,
-      include: ['metadatas', 'documents', 'distances']
-    });
-    
-    return results.metadatas[0].map((metadata, i) => [
-      new Document({
-        pageContent: results.documents[0][i],
-        metadata
-      }),
-      results.distances[0][i]
-    ]);
-  }
-}
-```
-
-## 📝 使用示例
-
-### 示例 1: 内存向量存储
-
-```typescript
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { Document } from '@langchain/core/documents';
-
-const embeddings = new OpenAIEmbeddings();
-
-// 创建存储
-const vectorStore = new MemoryVectorStore(embeddings);
-
-// 添加文档
-const documents = [
-  new Document({
-    pageContent: 'LangChain 是 LLM 应用开发框架',
-    metadata: { source: 'doc1' }
-  }),
-  new Document({
-    pageContent: '支持多种向量数据库',
-    metadata: { source: 'doc2' }
-  })
-];
-
-await vectorStore.addDocuments(documents);
-
-// 相似度搜索
-const results = await vectorStore.similaritySearch(
-  '什么是 LangChain?',
-  2
-);
-
-console.log(results[0].pageContent);
-```
-
-### 示例 2: Pinecone 集成
-
-```typescript
-import { PineconeStore } from '@langchain/pinecone';
-import { Pinecone } from '@pinecone-database/pinecone';
-import { OpenAIEmbeddings } from '@langchain/openai';
-
-const embeddings = new OpenAIEmbeddings();
-
-// 初始化 Pinecone 客户端
-const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-const index = pinecone.Index('my-index');
-
-// 创建存储
-const vectorStore = await PineconeStore.fromExistingIndex(
-  embeddings,
-  {
-    pineconeIndex: index,
-    namespace: 'docs'
-  }
-);
-
-// 搜索
-const results = await vectorStore.similaritySearch(
-  'LangChain 如何使用',
-  5,
-  { source: 'manual' }  // 过滤器
-);
-```
-
-### 示例 3: Chroma 集成
-
-```typescript
-import { Chroma } from '@langchain/chroma';
-import { OpenAIEmbeddings } from '@langchain/openai';
-
-const embeddings = new OpenAIEmbeddings();
-
-// 连接到 Chroma (需要运行 Chroma 服务)
-const vectorStore = await Chroma.fromExistingCollection(
-  embeddings,
-  {
-    collectionName: 'my-documents',
-    url: 'http://localhost:8000'
-  }
-);
-
-// 搜索
-const results = await vectorStore.similaritySearch(
-  '查询内容',
-  10,
-  { source: { $eq: 'manual' } }
-);
-```
-
-### 示例 4: 从文本创建
-
-```typescript
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { CharacterTextSplitter } from '@langchain/textsplitters';
-
-const embeddings = new OpenAIEmbeddings();
-const splitter = new CharacterTextSplitter({
-  chunkSize: 1000,
-  chunkOverlap: 200
-});
-
-const rawText = 'LangChain is a framework...';
-const documents = await splitter.createDocuments([rawText]);
-
-// 直接从文档创建向量存储
-const vectorStore = await MemoryVectorStore.fromDocuments(
-  documents,
-  embeddings
-);
-```
-
-### 示例 5: 作为检索器使用
-
-```typescript
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { OpenAIEmbeddings } from '@langchain/openai';
-
-const store = new MemoryVectorStore(new OpenAIEmbeddings());
-
-// 转换为检索器
-const retriever = store.asRetriever({
-  k: 5,
-  filter: async (doc) => doc.metadata.source === 'manual'
-});
-
-// 使用检索器
-const docs = await retriever.invoke('LangChain 简介');
-```
-
-## 🔍 相似度计算
-
-### 常见相似度算法
-
-```typescript
-// 余弦相似度
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    magnitudeA += a[i] ** 2;
-    magnitudeB += b[i] ** 2;
-  }
-  
-  return dotProduct / (Math.sqrt(magnitudeA) * Math.sqrt(magnitudeB));
-}
-
-// 欧几里得距离
-function euclideanDistance(a: number[], b: number[]): number {
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) {
-    sum += (a[i] - b[i]) ** 2;
-  }
-  return Math.sqrt(sum);
-}
-
-// 点积
-function dotProduct(a: number[], b: number[]): number {
-  return a.reduce((sum, val, i) => sum + val * b[i], 0);
-}
-```
-
-## 💡 最佳实践
-
-### ✅ 推荐
-
-```typescript
-// 1. 选择合适的分块大小
-const splitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 1000,
-  chunkOverlap: 200
-});
-
-// 2. 添加元数据过滤
-await store.similaritySearch(query, 5, { source: 'manual' });
-
-// 3. 使用 asRetriever 简化代码
-const retriever = store.asRetriever({ k: 5 });
-
-// 4. 生产环境使用向量数据库
-const store = await PineconeStore.fromExistingIndex(...);
-```
-
-### ❌ 不推荐
-
-```typescript
-// 1. 避免在内存中存储大量向量
-const store = new MemoryVectorStore(); // 仅用于原型
-
-// 2. 避免不添加元数据
-await store.addDocuments([
-  new Document({ pageContent: '...' })  // 没有 metadata
-]);
-
-// 3. 避免过大的 k 值
-await store.similaritySearch(query, 1000); // 性能问题
-```
-
----
+/**
+ * 文档接口
+ */\ninterface DocumentInterface {\n  pageContent: string;\n  metadata: Record<string, any>;\n}\n\n/**\n * 添加文档选项\n */\ninterface AddDocumentOptions {\n  ids?: string[];\n  [key: string]: any;\n}\n\n/**\n * 索引接口（用于类型约束）\n */\ninterface IndexInterface {}\n```\n\n## 📝 使用示例\n\n### 示例 1: 添加向量\n\n```typescript\nimport { MemoryVectorStore } from 'langchain/vectorstores/memory';\nimport { OpenAIEmbeddings } from '@langchain/openai';\nimport { Document } from '@langchain/core/documents';\n\nconst embeddings = new OpenAIEmbeddings();\nconst store = new MemoryVectorStore(embeddings);\n\n// 添加向量\nconst vectors = [[0.1, 0.2, ...], [0.3, 0.4, ...]];\nconst documents = [\n  new Document({ pageContent: '文档 1', metadata: { source: 'a' } }),\n  new Document({ pageContent: '文档 2', metadata: { source: 'b' } })\n];\n\n// addVectors 返回 Promise<string[] | void>\nconst ids = await store.addVectors(vectors, documents);\n// ids: string[] | void\n```\n\n### 示例 2: 添加文档\n\n```typescript\n// addDocuments 自动计算嵌入\n// 返回 Promise<string[] | void>\nconst ids = await store.addDocuments([\n  new Document({ pageContent: '内容 A', metadata: {} }),\n  new Document({ pageContent: '内容 B', metadata: {} })\n]);\n```\n\n### 示例 3: 相似度搜索\n\n```typescript\n// similaritySearch 方法\n// k 参数默认值为 4，filter 类型为 this[\"FilterType\"]\nconst results = await store.similaritySearch(\n  '查询内容',\n  5,  // k=5\n  { source: 'a' }  // filter\n);\n\n// similaritySearchWithScore 返回 [Document, number][]\nconst resultsWithScore = await store.similaritySearchWithScore(\n  '查询内容',\n  5\n);\n// 每个结果：[Document, 相似度分数]\n```\n\n### 示例 4: MemoryVectorStore 完整示例\n\n```typescript\nimport { MemoryVectorStore } from 'langchain/vectorstores/memory';\nimport { OpenAIEmbeddings } from '@langchain/openai';\nimport { Document } from '@langchain/core/documents';\n\nconst embeddings = new OpenAIEmbeddings();\n\n// 从文档创建\nconst documents = [\n  new Document({ pageContent: '文档 1', metadata: {} }),\n  new Document({ pageContent: '文档 2', metadata: {} })\n];\n\nconst store = await MemoryVectorStore.fromDocuments(\n  documents,\n  embeddings\n);\n\n// 相似度搜索\nconst results = await store.similaritySearch('查询', 5);\n```\n\n### 示例 5: 删除文档\n\n```typescript\n// delete 方法（部分提供商支持）\nawait store.delete({\n  ids: ['id1', 'id2'],\n  filter: { source: 'a' }  // 类型为 this[\"FilterType\"]\n});\n```\n\n## ⚠️ 常见错误\n\n### 错误 1: 忽略返回类型\n\n```typescript\n// ❌ 错误假设一定返回 string[]\nconst ids = await store.addVectors(vectors, docs);\nconst newDocs = ids.map(id => ...);  // 可能报错！\n\n// ✅ 正确处理\nconst ids = await store.addVectors(vectors, docs);\nif (ids) {  // 检查是否为 void\n  const newDocs = ids.map(id => ...);\n}\n```\n\n### 错误 2: 错误使用 filter 类型\n\n```typescript\n// ❌ 错误：filter 类型是 this[\"FilterType\"]，不是统一的 FilterType\nawait store.similaritySearch(query, 5, { custom: 'filter' });\n\n// ✅ 正确：查看具体实现的 FilterType\nawait store.similaritySearch(query, 5, { source: 'a' });  // 根据具体提供商\n```\n\n### 错误 3: 忽略 k 参数必填\n\n```typescript\n// ❌ 错误：k 参数必填，无默认值（在 similaritySearchVectorWithScore 中）\nawait store.similaritySearchVectorWithScore(queryVector);\n\n// ✅ 正确：明确指定 k\nawait store.similaritySearchVectorWithScore(queryVector, 5);\n```\n\n## 💡 最佳实践\n\n### ✅ 推荐\n\n```typescript\n// 1. 检查返回值类型\nconst result = await store.addVectors(vectors, docs);\nif (result) { /* string[] */ } else { /* void */ }\n\n// 2. 使用正确的 FilterType\nconst store = new PineconeStore(embeddings, { index: 'my-index' });\nawait store.similaritySearch(query, 5, { namespace: 'ns1' });  // Pinecone 的 FilterType\n\n// 3. 利用默认值\nawait store.similaritySearch(query);  // k=4 默认值\n```\n\n---
 
 **源码参考**: `libs/langchain-core/src/vectorstores.ts`
