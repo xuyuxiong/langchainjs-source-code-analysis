@@ -60,18 +60,18 @@ LangChainJS 采用清晰的分层架构设计：
 ```typescript
 interface Runnable<RunInput, CallOptions, RunOutput> {
   // 单次调用
-  invoke(input: RunInput, options?: CallOptions): Promise<RunOutput>;
+  invoke(input: RunInput, options?: Partial<CallOptions>): Promise<RunOutput>;
   
   // 流式响应
-  stream(input: RunInput, options?: CallOptions): AsyncGenerator<RunOutput>;
+  stream(input: RunInput, options?: Partial<CallOptions>): AsyncGenerator<RunOutput>;
   
   // 批量处理
-  batch(inputs: RunInput[], options?: CallOptions): Promise<RunOutput[]>;
+  batch(inputs: RunInput[], options?: Partial<CallOptions>, batchOptions?: RunnableBatchOptions): Promise<RunOutput[]>;
   
   // 组合方法
-  pipe(other: Runnable): RunnableSequence;
-  bind(boundArgs: CallOptions): Runnable;
-  withConfig(config: RunnableConfig): Runnable;
+  pipe<NewRunOutput>(next: Runnable<RunOutput, CallOptions, NewRunOutput>): RunnableSequence<RunInput, NewRunOutput>;
+  bind(boundArgs: Partial<CallOptions>): Runnable<RunInput, CallOptions, RunOutput>;
+  withConfig(config: RunnableConfig): Runnable<RunInput, CallOptions, RunOutput>;
 }
 ```
 
@@ -116,7 +116,7 @@ const chain = new RunnableSequence({
 │  BaseMessage (基类)                         │
 │  ├─ content: string | ArrayContent         │
 │  ├─ name?: string                          │
-│  ├─ role?: string                          │
+│  ├─ id?: string                            │
 │  ├─ additional_kwargs: Record<string, any> │
 └─────────────────────────────────────────────┘
          │
@@ -124,9 +124,10 @@ const chain = new RunnableSequence({
     ▼    ▼    ▼            ▼            ▼
 HumanMessage  AIMessage  SystemMessage  ToolMessage
 ├─ content    ├─ content  ├─ content     ├─ tool_call_id
-└─ type       ├─ tool_calls              └─ status
+└─ type       ├─ tool_calls             └─ artifact
               ├─ usage_metadata
-              └─ refusal
+              ├─ refusal
+              └─ id
 ```
 
 ### 4. 回调与追踪系统
@@ -149,47 +150,52 @@ CallbackManager
 └── CustomHandler            (自定义实现)
 ```
 
-## 📦 Monorepo 结构
+## 📦 Monorepo 结构 (2024年5月更新)
 
 ### 包组织
 
 ```
 langchainjs/
-├──/libs/
-│   ├── langchain-core/        # 核心抽象与接口 (15,000 行)
+├── libs/
+│   ├── langchain-core/        # 核心抽象与接口 (~35,000 行)
 │   │   ├── src/
-│   │   │   ├── runnables/     # LCEL 运行时 (11 个文件)
+│   │   │   ├── runnables/     # LCEL 运行时 (16 个文件)
 │   │   │   ├── language_models/ # LLM/Chat 抽象
 │   │   │   ├── messages/      # 19 种消息类型
-│   │   │   ├── prompts/       # 15 种提示模板
+│   │   │   ├── prompts/       # 15+ 种提示模板
 │   │   │   ├── output_parsers/# 输出解析器
 │   │   │   ├── callbacks/     # 回调系统
 │   │   │   ├── tracers/       # 追踪器
-│   │   │   └── vectorstores.ts# 向量存储 (3,500 行)
+│   │   │   └── vectorstores.ts# 向量存储接口
 │   │   └── tests/
 │   │
-│   ├── langchain/            # 高级 API (8,000 行)
-│   │   ├── chains/           # Chain 实现
-│   │   ├── agents/           # Agent 实现
-│   │   └── memory/           # 记忆实现
+│   ├── langchain/            # 高级 API (~8,000 行)
+│   │   ├── src/
+│   │   │   ├── chains/       # Chain 实现
+│   │   │   ├── agents/       # Agent 实现
+│   │   │   └── memory/       # 记忆实现
+│   │   └── tests/
 │   │
-│   ├── langchain-classic/    # 兼容旧版 API (5,000 行)
+│   ├── langchain-classic/    # 兼容旧版 API (~5,000 行)
 │   │
-│   ├── langchain-textsplitters/ # 文本分割 (3,000 行)
+│   ├── langchain-textsplitters/ # 文本分割 (~3,000 行)
 │   │
-│   └── providers/            # 35+ 提供商集成
-│       ├── openai/           # OpenAI 集成
-│       ├── anthropic/        # Anthropic 集成
-│       ├── google-genai/     # Google Generative AI
-│       ├── cohere/           # Cohere
+│   ├── langchain-mcp-adapters/  # MCP适配器 (~2,000 行，新增)
+│   │
+│   └── providers/            # 35+ 提供商集成 (~50,000+ 行)
+│       ├── langchain-openai/
+│       ├── langchain-anthropic/
+│       ├── langchain-google-genai/
+│       ├── langchain-cohere/
 │       └── ...               # 30+ 其他提供商
 │
-├── /internal/                # 内部工具
-├── /examples/                # 示例代码
-└── /docs/                    # 官方文档
+├── create-langchain-integration/ # 集成创建工具
+├── internal/                # 内部工具
+├── examples/                # 示例代码
+└── docs/                    # 官方文档
 ```
 
-### 依赖关系
+### 实际依赖关系
 
 ```
 应用代码
@@ -295,18 +301,18 @@ invoke() 结束
 
 ## 📊 关键文件统计
 
-| 模块 | 文件数 | 代码行数 | 主要功能 |
-|------|--------|----------|----------|
-| runnables/ | 11 | ~15,000 | LCEL 运行时 |
-| language_models/ | 8 | ~5,000 | LLM/Chat 抽象 |
+| 模块 | 实际文件数 | 估计代码行数 | 主要功能 |
+|------|------------|--------------|----------|
+| runnables/ | 16 | ~15,000+ | LCEL 运行时 |
+| language_models/ | 10 | ~5,000 | LLM/Chat 抽象 |
 | messages/ | 19 | ~4,000 | 消息类型系统 |
-| prompts/ | 15 | ~3,500 | 提示模板 |
-| output_parsers/ | 12 | ~2,000 | 输出解析 |
-| callbacks/ | 8 | ~2,000 | 回调管理 |
-| vectorstores.ts | 1 | ~3,500 | 向量存储 |
-| **Core 总计** | ~50 | **~35,000** | 核心抽象 |
-| langchain/ | ~40 | ~8,000 | 高级 API |
-| providers/ | 35+ | ~50,000 | 第三方集成 |
+| prompts/ | 15+ | ~3,500 | 提示模板 |
+| output_parsers/ | 12+ | ~2,000 | 输出解析 |
+| callbacks/ | 8+ | ~2,000 | 回调管理 |
+| vectorstores.ts | 1 | ~3,500 | 向量存储接口 |
+| **Core 总计** | ~60+ | **~35,000** | 核心抽象 |
+| langchain/ | ~50+ | ~8,000 | 高级 API |
+| providers/ | 35+包 | ~50,000+ | 第三方集成 |
 
 ## 🔑 核心类关系图
 
@@ -342,15 +348,11 @@ invoke() 结束
 
 ## 💡 设计优势
 
-| 优势 | 说明 |
-|------|------|
-| **统一接口** | 所有组件实现 Runnable，可互换组合 |
-| **类型安全** | 完整 TypeScript 类型推导 |
-| **流式优先** | 原生支持 AsyncGenerator 流式响应 |
-| **可组合** | 像 Unix 管道一样组合组件 |
-| **回调系统** | 统一的生命周期事件追踪 |
-| **模块化** | 40+独立包，按需安装 |
-
----
-
-**源码参考**: `/Users/xilin/Documents/sources/langchainjs/`
+| 优势 | 实际验证结果 |
+|------|--------------|
+| **统一接口** | ✅ 所有组件实现 Runnable，可互换组合 |
+| **类型安全** | ✅ 完整 TypeScript 类型推导 |
+| **流式优先** | ✅ 原生支持 AsyncGenerator 流式响应 |
+| **可组合** | ✅ 像 Unix 管道一样组合组件 |
+| **回调系统** | ✅ 统一的生命周期事件追踪 |
+| **模块化** | ✅ 40+独立包，按需安装 |
