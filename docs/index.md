@@ -107,42 +107,11 @@ OpenAI、Anthropic 等提供商集成详解，以及如何自定义集成
 - ⚙️ **深度解析**：详细解析 LCEL 表达式语言和 Runnable 接口
 - 📱 **现代化体验**：响应式设计、暗色模式、代码高亮
 
-<div class="action-buttons">
-  <a href="/langchainjs-source-code-analysis/guide/getting-started.html" class="btn-get-started">→ 开始学习</a>
-</div>
-
 <style>
 .why-learn {
   background: var(--vp-c-bg-soft);
   border-radius: 8px;
   padding: 24px;
   margin: 24px 0;
-}
-
-.action-buttons {
-  margin-top: 32px;
-  padding-top: 32px;
-  border-top: 1px solid var(--vp-c-divider);
-}
-
-.btn-get-started {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  color: var(--vp-c-brand);
-  font-size: 16px;
-  font-weight: 500;
-  text-decoration: none;
-  padding: 10px 16px;
-  border: 2px solid var(--vp-c-brand);
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.btn-get-started:hover {
-  background: var(--vp-c-brand);
-  color: #fff;
-  transform: translateX(4px);
 }
 </style>
