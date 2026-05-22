@@ -5,13 +5,7 @@ hero:
   name: LangChainJS 源码深度解析
   text: LangChainJS 完整源码学习指南
   tagline: 从 LCEL 到 Agent 系统，全面掌握 LangChain 核心原理
-  image:
-    src: /langchain-logo.svg
-    alt: LangChain Logo
   actions:
-    - theme: brand
-      text: 开始学习
-      link: /guide/getting-started
     - theme: alt
       text: GitHub
       link: https://github.com/xuyuxiong/langchainjs-source-code-analysis
@@ -93,7 +87,7 @@ OpenAI、Anthropic 等提供商集成详解，以及如何自定义集成
 ## 👥 谁适合学习？
 
 - ✅ 有 1-2 年 LangChain 使用经验
-- ✅ 熟悉 JavaScript/TypeScript
+- ✅ 熟悉 JavaScript/TypeScript 基础
 - ✅ 对 LLM 应用开发有热情
 - ✅ 愿意投入时间深入学习
 
@@ -113,5 +107,32 @@ OpenAI、Anthropic 等提供商集成详解，以及如何自定义集成
   border-radius: 8px;
   padding: 24px;
   margin: 24px 0;
+}
+
+.action-buttons {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.btn-get-started {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--vp-c-brand);
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 10px 16px;
+  border: 2px solid var(--vp-c-brand);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-get-started:hover {
+  background: var(--vp-c-brand);
+  color: #fff;
+  transform: translateX(4px);
 }
 </style>
